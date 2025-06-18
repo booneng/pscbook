@@ -4,10 +4,13 @@ import os
 import time
 
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+CHROME_EXECUTABLE_PATH_ENV = 'CHROME_EXECUTABLE_PATH'
 
 PSC_EMAIL_ENV = 'PSC_EMAIL'
 PSC_PASSWORD_ENV = 'PSC_PASSWORD'
@@ -70,7 +73,7 @@ def click_button(driver, button_xpath):
     button_xpath: Xpath of the button element.
 
   Raises:
-
+    TimeoutException: When element cannot be found or clicked.
   """
   element = WebDriverWait(driver, 10).until(
     EC.presence_of_element_located((By.XPATH, button_xpath))
@@ -100,7 +103,7 @@ def book_court(driver):
   click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
   click_button(driver, TYPE_SELECTION_XPATH)
   time.sleep(5)
-  logger.info(f'Trying to book for {booking_date}.')
+  logger.info(f'Trying to book for {booking_date.day}.')
   try:
     click_button(driver, TIME_SELECTION_1_XPATH)
     time.sleep(2)
@@ -117,8 +120,21 @@ def book_court(driver):
 
 
 def main():
-  logging.basicConfig(filename='pscbook.log', level=logging.INFO)
-  driver = webdriver.Chrome()
+  logging.basicConfig(
+    filename='pscbook.log',
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
+  chrome_options = Options()
+  chrome_options.add_argument('--no-sandbox')
+  chrome_options.add_argument('--disable-dev-shm-usage')
+  if CHROME_EXECUTABLE_PATH_ENV in os.environ:
+    driver = webdriver.Chrome(
+      service=webdriver.ChromeService(
+        executable_path=os.environ[CHROME_EXECUTABLE_PATH_ENV]),
+      options=chrome_options)
+  else:
+    driver = webdriver.Chrome(options=chrome_options)
   try:
     psc_email = os.environ[PSC_EMAIL_ENV]
     psc_password = os.environ[PSC_PASSWORD_ENV]
