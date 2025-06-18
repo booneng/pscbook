@@ -125,16 +125,22 @@ def main():
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S')
-  chrome_options = Options()
-  chrome_options.add_argument('--no-sandbox')
-  chrome_options.add_argument('--disable-dev-shm-usage')
-  if CHROME_EXECUTABLE_PATH_ENV in os.environ:
-    driver = webdriver.Chrome(
-      service=webdriver.ChromeService(
-        executable_path=os.environ[CHROME_EXECUTABLE_PATH_ENV]),
-      options=chrome_options)
-  else:
-    driver = webdriver.Chrome(options=chrome_options)
+
+  try:
+    chrome_options = Options()
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    if CHROME_EXECUTABLE_PATH_ENV in os.environ:
+      driver = webdriver.Chrome(
+        service=webdriver.ChromeService(
+          executable_path=os.environ[CHROME_EXECUTABLE_PATH_ENV]),
+        options=chrome_options)
+    else:
+      driver = webdriver.Chrome(options=chrome_options)
+  except Exception as e:
+    logging.exception('Failed to start chrome.')
+    return
+
   try:
     psc_email = os.environ[PSC_EMAIL_ENV]
     psc_password = os.environ[PSC_PASSWORD_ENV]
