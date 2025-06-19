@@ -9,6 +9,7 @@ from selenium.common.exceptions import StaleElementReferenceException, ElementCl
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from pyvirtualdisplay import Display
 
 CHROME_EXECUTABLE_PATH_ENV = 'CHROME_EXECUTABLE_PATH'
 
@@ -24,11 +25,15 @@ LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
 # Booking site constants.
 BOOKING_SITE = "https://picklesocialclub.playbypoint.com/book/picklesocialclub"
 DAY_SELECTION_XPATH = '//button[div[@class="day_number" and text()="{}"]]'
-TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
-TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="8-9am"]'
-TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="9-10am"]'
+COVERED_TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
+OUTDOOR_TYPE_SELECTION_XPATH = '//button[text()="Outdoor Pickleball"]'
+TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="1-2pm"]'
+TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="2-3pm"]'
+CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
+CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
 NEXT_BUTTON_XPATH = '//div[@class="content active"]//button[span[text()=" Next "]]'
+
 
 logger = logging.getLogger(__name__)
 
@@ -96,27 +101,40 @@ def book_court(driver):
   
   Args:
     driver: Selenium webdriver used for interacting with the websites.
+
+  Returns:
+    Boolean for whether the booking was successful.
   """
   driver.get(BOOKING_SITE)
 
   booking_date = datetime.datetime.today() + datetime.timedelta(7)
-  click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
-  click_button(driver, TYPE_SELECTION_XPATH)
-  time.sleep(5)
+  # click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
+  click_button(driver, DAY_SELECTION_XPATH.format(24))
   logger.info(f'Trying to book for {booking_date.day}.')
-  try:
-    click_button(driver, TIME_SELECTION_1_XPATH)
-    time.sleep(2)
-    click_button(driver, TIME_SELECTION_2_XPATH)
-  except TimeoutException as e:
-    logging.exception('Failed to select time. Court may be unavailable.')
-    return
+  for court_type_xpath in (COVERED_TYPE_SELECTION_XPATH, OUTDOOR_TYPE_SELECTION_XPATH):
+    try:
+      click_button(driver, court_type_xpath)
+      time.sleep(2)
+      click_button(driver, TIME_SELECTION_1_XPATH)
+      click_button(driver, TIME_SELECTION_2_XPATH)
+      break
+    except TimeoutException as e:
+      logging.exception('Failed to select time. Court may be unavailable.')
+      if court_type_xpath is OUTDOOR_TYPE_SELECTION_XPATH:
+        logging.info('Both court types unavailable.')
+        return False
+
   click_button(driver, NEXT_BUTTON_XPATH)
-  time.sleep(5)
+  time.sleep(3)
   click_button(driver, NEXT_BUTTON_XPATH)
+  click_button(driver, CLUB_CREDITS_SELECTION_XPATH)
+  WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.XPATH, CLUB_CREDITS_ACTIVE_XPATH))
+  )
   click_button(driver, BOOK_BUTTON_XPATH)
+  time.sleep(5)
   logger.info('Booked court.')
-  time.sleep(10)  
+  return True
 
 
 def main():
@@ -127,9 +145,9 @@ def main():
     datefmt='%Y-%m-%d %H:%M:%S')
 
   try:
+    display = Display(visible=0, size=(1920, 1080)) 
+    display.start()
     chrome_options = Options()
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
     if CHROME_EXECUTABLE_PATH_ENV in os.environ:
       driver = webdriver.Chrome(
         service=webdriver.ChromeService(
@@ -146,8 +164,9 @@ def main():
     psc_password = os.environ[PSC_PASSWORD_ENV]
     login_to_coursite(driver, psc_email, psc_password)
     logger.info('Logged in.')
-    for _ in range(2):
-      book_court(driver)
+    for i in range(2):
+      booking_successful = book_court(driver)
+      logging.info(f'Booking result: {booking_successful}')
   finally:
     driver.quit()
 
