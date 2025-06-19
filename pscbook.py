@@ -27,8 +27,8 @@ BOOKING_SITE = "https://picklesocialclub.playbypoint.com/book/picklesocialclub"
 DAY_SELECTION_XPATH = '//button[div[@class="day_number" and text()="{}"]]'
 COVERED_TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
 OUTDOOR_TYPE_SELECTION_XPATH = '//button[text()="Outdoor Pickleball"]'
-TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="1-2pm"]'
-TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="2-3pm"]'
+TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="8-9pm"]'
+TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="9-10pm"]'
 CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
 CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
@@ -96,11 +96,12 @@ def click_button(driver, button_xpath):
       times += 1
 
 
-def book_court(driver):
+def book_court(driver, covered):
   """Books a court 7 days later.
   
   Args:
     driver: Selenium webdriver used for interacting with the websites.
+    covered: Whether to book covered or outdoor court.
 
   Returns:
     Boolean for whether the booking was successful.
@@ -108,21 +109,16 @@ def book_court(driver):
   driver.get(BOOKING_SITE)
 
   booking_date = datetime.datetime.today() + datetime.timedelta(7)
-  # click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
-  click_button(driver, DAY_SELECTION_XPATH.format(24))
-  logger.info(f'Trying to book for {booking_date.day}.')
-  for court_type_xpath in (COVERED_TYPE_SELECTION_XPATH, OUTDOOR_TYPE_SELECTION_XPATH):
-    try:
-      click_button(driver, court_type_xpath)
-      time.sleep(2)
-      click_button(driver, TIME_SELECTION_1_XPATH)
-      click_button(driver, TIME_SELECTION_2_XPATH)
-      break
-    except TimeoutException as e:
-      logging.exception('Failed to select time. Court may be unavailable.')
-      if court_type_xpath is OUTDOOR_TYPE_SELECTION_XPATH:
-        logging.info('Both court types unavailable.')
-        return False
+  click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
+  logger.info(f'Trying to book for {booking_date.day}, covered: {covered}.')
+  court_type_xpath = COVERED_TYPE_SELECTION_XPATH if covered else OUTDOOR_TYPE_SELECTION_XPATH
+  try:
+    click_button(driver, court_type_xpath)
+    time.sleep(2)
+    click_button(driver, TIME_SELECTION_1_XPATH)
+    click_button(driver, TIME_SELECTION_2_XPATH)
+  except TimeoutException as e:
+    logging.exception('Failed to select time. Court may be unavailable.')
 
   click_button(driver, NEXT_BUTTON_XPATH)
   time.sleep(3)
@@ -164,8 +160,12 @@ def main():
     psc_password = os.environ[PSC_PASSWORD_ENV]
     login_to_coursite(driver, psc_email, psc_password)
     logger.info('Logged in.')
-    for i in range(2):
-      booking_successful = book_court(driver)
+    covered = True
+    for _ in range(2):
+      booking_successful = book_court(driver, covered)
+      if covered and not booking_successful:
+        covered = False
+        booking_successful = book_court(driver, covered)
       logging.info(f'Booking result: {booking_successful}')
   finally:
     driver.quit()
