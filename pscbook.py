@@ -119,6 +119,7 @@ def book_court(driver, covered):
     click_button(driver, TIME_SELECTION_2_XPATH)
   except TimeoutException as e:
     logging.exception('Failed to select time. Court may be unavailable.')
+    return False
 
   click_button(driver, NEXT_BUTTON_XPATH)
   time.sleep(3)
