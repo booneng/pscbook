@@ -118,13 +118,14 @@ def book_court(driver, covered):
     click_button(driver, TIME_SELECTION_1_XPATH)
     click_button(driver, TIME_SELECTION_2_XPATH)
   except TimeoutException as e:
-    logging.exception('Failed to select time. Court may be unavailable.')
+    logging.exception(f'Failed to select time. Court may be unavailable. html: {driver.page_source}')
     return False
 
   click_button(driver, NEXT_BUTTON_XPATH)
   time.sleep(3)
   click_button(driver, NEXT_BUTTON_XPATH)
   click_button(driver, CLUB_CREDITS_SELECTION_XPATH)
+  # Wait for club credits to be selected.
   WebDriverWait(driver, 10).until(
     EC.presence_of_element_located((By.XPATH, CLUB_CREDITS_ACTIVE_XPATH))
   )
