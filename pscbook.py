@@ -109,10 +109,10 @@ def book_court(driver, covered):
   driver.get(BOOKING_SITE)
 
   booking_date = datetime.datetime.today() + datetime.timedelta(7)
-  click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
-  logger.info(f'Trying to book for {booking_date.day}, covered: {covered}.')
   court_type_xpath = COVERED_TYPE_SELECTION_XPATH if covered else OUTDOOR_TYPE_SELECTION_XPATH
+  logger.info(f'Trying to book for {booking_date.day}, covered: {covered}.')
   try:
+    click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
     click_button(driver, court_type_xpath)
     time.sleep(2)
     click_button(driver, TIME_SELECTION_1_XPATH)
