@@ -27,8 +27,8 @@ BOOKING_SITE = "https://picklesocialclub.playbypoint.com/book/picklesocialclub"
 DAY_SELECTION_XPATH = '//button[div[@class="day_number" and text()="{}"]]'
 COVERED_TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
 OUTDOOR_TYPE_SELECTION_XPATH = '//button[text()="Outdoor Pickleball"]'
-TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="8-9pm"]'
-TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="9-10pm"]'
+TIME_SELECTION_1_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="8-9am"]'
+TIME_SELECTION_2_XPATH = '//button[@class="ButtonOption ui button basic  " and text()="9-10am"]'
 CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
 CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
@@ -110,9 +110,10 @@ def book_court(driver, covered):
 
   booking_date = datetime.datetime.today() + datetime.timedelta(7)
   court_type_xpath = COVERED_TYPE_SELECTION_XPATH if covered else OUTDOOR_TYPE_SELECTION_XPATH
-  logger.info(f'Trying to book for {booking_date.day}, covered: {covered}.')
+  day_number = str(booking_date.day) if booking_date.day > 10 else f'0{booking_date.day}'
+  logger.info(f'Trying to book for {day_number}, covered: {covered}.')
   try:
-    click_button(driver, DAY_SELECTION_XPATH.format(booking_date.day))
+    click_button(driver, DAY_SELECTION_XPATH.format(day_number))
     click_button(driver, court_type_xpath)
     time.sleep(2)
     click_button(driver, TIME_SELECTION_1_XPATH)
@@ -121,16 +122,20 @@ def book_court(driver, covered):
     logging.exception(f'Failed to select time. Court may be unavailable. html: {driver.page_source}')
     return False
 
-  click_button(driver, NEXT_BUTTON_XPATH)
-  time.sleep(3)
-  click_button(driver, NEXT_BUTTON_XPATH)
-  click_button(driver, CLUB_CREDITS_SELECTION_XPATH)
-  # Wait for club credits to be selected.
-  WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.XPATH, CLUB_CREDITS_ACTIVE_XPATH))
-  )
-  click_button(driver, BOOK_BUTTON_XPATH)
-  time.sleep(5)
+  try:
+    click_button(driver, NEXT_BUTTON_XPATH)
+    time.sleep(3)
+    click_button(driver, NEXT_BUTTON_XPATH)
+    click_button(driver, CLUB_CREDITS_SELECTION_XPATH)
+    # Wait for club credits to be selected.
+    WebDriverWait(driver, 10).until(
+      EC.presence_of_element_located((By.XPATH, CLUB_CREDITS_ACTIVE_XPATH))
+    )
+    click_button(driver, BOOK_BUTTON_XPATH)
+    time.sleep(5)
+  except TimeoutException as e:
+    logging.exception(f'Failed to complete booking. html: {driver.page_source}')
+    return False
   logger.info('Booked court.')
   return True
 
