@@ -2,10 +2,12 @@ import datetime
 import logging
 import os
 import time
+import pprint
+import sys
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException, ElementNotInteractableException
+from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException, ElementNotInteractableException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -33,6 +35,8 @@ CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
 CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
 NEXT_BUTTON_XPATH = '//div[@class="content active"]//button[span[text()=" Next "]]'
+SECTIONS_XPATH = '//div[@class="StepperItem StepperItemFluid "]'
+CONTENT_ACTIVE_XPATH = '//div[@class="content active"]'
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +73,6 @@ def login_to_coursite(driver, psc_email, psc_password):
   time.sleep(10)
 
 
-
 def click_button_by_xpath(driver, button_xpath):
   """Waits for button to be present and clickable and clicks it.
   
@@ -80,45 +83,51 @@ def click_button_by_xpath(driver, button_xpath):
   Raises:
     TimeoutException: When element cannot be found or clicked.
   """
-  element = WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.XPATH, button_xpath))
-  )
-  click_button_by_element(element)
-
-
-def click_button_by_element(element):
-  """Click an element.
-  
-  Args:
-    element: Element to click.
-  """
-  times = 0
-  while (times < 2):
+  for _ in range(2):
     try:
+      element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, button_xpath))
+      )
       element.click()
+      time.sleep(5)
       break
     except (StaleElementReferenceException, ElementClickInterceptedException):
-      times += 1
-
-
-def check_time_selection(time_selection):
-  """Checks time selection is still available
-  
-  Args:
-    time_selection: Time selection element.
-  """
-  return 'red' not in time_selection.get_attribute('class').split(' ')
+      logging.exception('Stale when trying to click button.')
 
 
 def click_time_selection(driver, time_selection_xpath):
-  time_selection_element = WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.XPATH, time_selection_xpath))
-  )
-  if not check_time_selection(time_selection_element):
-    logging.error(f'Time selection not available: {time_selection_xpath}')
+  for _ in range(2):
+    try:
+      time_selection_element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, time_selection_xpath))
+      )
+      if 'red' in time_selection_element.get_attribute('class').split(' '):
+        logging.error(f'Time selection not available: {time_selection_xpath}')
+        return False
+      if 'primary' in time_selection_element.get_attribute('class').split(' '):
+        return True
+      pprint.pprint(f'time selection {time_selection_element.get_attribute('innerHTML')}')
+      time_selection_element.click()
+      time.sleep(5)
+      # Verify time selected.
+      time_selection_element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, time_selection_xpath))
+      )
+      if 'primary' not in time_selection_element.get_attribute('class'):
+        logging.error('Time available but did not click.')
+        return False
+      return True
+    except StaleElementReferenceException as e:
+      logging.exception('Stale reference exception.')
+  return False
+
+
+def contains_element(element, child_xpath):
+  try:
+    element.find_element(By.XPATH, child_xpath)
+    return True
+  except NoSuchElementException:
     return False
-  click_button_by_element(time_selection_element)
-  return True
 
 
 def book_court(driver, covered):
@@ -135,27 +144,33 @@ def book_court(driver, covered):
 
   booking_date = datetime.datetime.today() + datetime.timedelta(7)
   court_type_xpath = COVERED_TYPE_SELECTION_XPATH if covered else OUTDOOR_TYPE_SELECTION_XPATH
-  day_number = str(booking_date.day) if booking_date.day > 10 else f'0{booking_date.day}'
+  day_number = str(booking_date.day) if booking_date.day >= 10 else f'0{booking_date.day}'
   logger.info(f'Trying to book for {day_number}, covered: {covered}.')
   try:
     click_button_by_xpath(driver, DAY_SELECTION_XPATH.format(day_number))
     click_button_by_xpath(driver, court_type_xpath)
-    time.sleep(2)
-    if not (
-      click_time_selection(driver, TIME_SELECTION_1_XPATH)
-      or click_time_selection(driver, TIME_SELECTION_2_XPATH)
-    ):
+    time_selection_1_result = click_time_selection(driver, TIME_SELECTION_1_XPATH)
+    time_selection_2_result = click_time_selection(driver, TIME_SELECTION_2_XPATH)
+    if not (time_selection_1_result or time_selection_2_result):
       logging.error(f'Both time selections not available.')
       return False
   except (TimeoutException, ElementNotInteractableException) as e:
     logger.exception(f'Failed to select time. Court may be unavailable.')
-    logging.debug(driver.page_source)
     return False
 
   try:
+    sections = driver.find_elements(By.XPATH, SECTIONS_XPATH)
+    if not contains_element(sections[0], CONTENT_ACTIVE_XPATH):
+      logging.error('Wrong div active.')
     click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
+    # Verify next section active.
+    if not contains_element(sections[1], CONTENT_ACTIVE_XPATH):
+      logging.error('Wrong div active1.')
     time.sleep(3)
     click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
+    # Verify next section active.
+    if not contains_element(sections[2], CONTENT_ACTIVE_XPATH):
+      logging.error('Wrong div active2.')
     click_button_by_xpath(driver, CLUB_CREDITS_SELECTION_XPATH)
     # Wait for club credits to be selected.
     WebDriverWait(driver, 10).until(
@@ -165,7 +180,6 @@ def book_court(driver, covered):
     time.sleep(10)
   except (TimeoutException, ElementNotInteractableException) as e:
     logger.exception(f'Failed to complete booking. html: {driver.page_source}')
-    logging.debug(driver.page_source)
     return False
   logger.info('Booked court.')
   return True
@@ -173,14 +187,10 @@ def book_court(driver, covered):
 
 def main():
   logging.basicConfig(
+    # stream=sys.stdout,
     filename='pscbook.log',
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S')
-  logging.basicConfig(
-    filename='pscbook_debug.log',
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.DEBUG,
     datefmt='%Y-%m-%d %H:%M:%S')
 
   try:
@@ -203,7 +213,7 @@ def main():
     psc_password = os.environ[PSC_PASSWORD_ENV]
     login_to_coursite(driver, psc_email, psc_password)
     logger.info('Logged in.')
-    covered = True
+    covered = False
     for _ in range(3):
       booking_successful = book_court(driver, covered)
       if covered and not booking_successful:
