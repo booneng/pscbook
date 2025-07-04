@@ -2,8 +2,6 @@ import datetime
 import logging
 import os
 import time
-import pprint
-import sys
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -106,7 +104,6 @@ def click_time_selection(driver, time_selection_xpath):
         return False
       if 'primary' in time_selection_element.get_attribute('class').split(' '):
         return True
-      pprint.pprint(f'time selection {time_selection_element.get_attribute('innerHTML')}')
       time_selection_element.click()
       time.sleep(5)
       # Verify time selected.
