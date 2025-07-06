@@ -29,13 +29,19 @@ COVERED_TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
 OUTDOOR_TYPE_SELECTION_XPATH = '//button[text()="Outdoor Pickleball"]'
 TIME_SELECTION_1_XPATH = '//button[text()="8-9am"]'
 TIME_SELECTION_2_XPATH = '//button[text()="9-10am"]'
+# TIME_SELECTION_1_XPATH = '//button[text()="12-1pm"]'
+# TIME_SELECTION_2_XPATH = '//button[text()="1-2pm"]'
 CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
 CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
 NEXT_BUTTON_XPATH = '//div[@class="content active"]//button[span[text()=" Next "]]'
 SECTIONS_XPATH = '//div[@class="StepperItem StepperItemFluid "]'
 CONTENT_ACTIVE_XPATH = '//div[@class="content active"]'
+COURT_BUTTON_XPATH = '//button[text()="Court {}"]'
 INNER_HTML_ATTRIBUTE = 'innerHTML'
+
+OUTDOOR_COURT_PRIORITY = [2, 4, 1, 3]
+COVERED_COURT_PRIORITY = [5, 7, 6, 8]
 
 
 logger = logging.getLogger(__name__)
@@ -82,10 +88,10 @@ def click_button_by_xpath(driver, button_xpath):
   Raises:
     TimeoutException: When element cannot be found or clicked.
   """
-  for _ in range(2):
+  for _ in range(3):
     try:
       element = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, button_xpath))
+        EC.element_to_be_clickable((By.XPATH, button_xpath))
       )
       logger.info(f'Clicking button: {element.get_attribute(INNER_HTML_ATTRIBUTE)}')
       element.click()
@@ -154,6 +160,20 @@ def book_court(driver, covered):
     if not (time_selection_1_result or time_selection_2_result):
       logger.error(f'Both time selections not available.')
       return False
+    court_priority = COVERED_COURT_PRIORITY if covered else OUTDOOR_COURT_PRIORITY
+    court_clicked = False
+    for court_number in court_priority:
+      try:
+        WebDriverWait(driver, 10).until(
+          EC.presence_of_element_located((By.XPATH, COURT_BUTTON_XPATH.format(court_number)))
+        )
+        click_button_by_xpath(driver, COURT_BUTTON_XPATH.format(court_number))
+        court_clicked = True
+        break
+      except TimeoutException as e:
+        logger.exception(f'Court {court_number} not available.')
+    if not court_clicked:
+      return False
   except (TimeoutException, ElementNotInteractableException) as e:
     logger.exception(f'Failed to select time. Court may be unavailable.')
     return False
@@ -213,7 +233,7 @@ def main():
     psc_password = os.environ[PSC_PASSWORD_ENV]
     login_to_coursite(driver, psc_email, psc_password)
     logger.info('Logged in.')
-    covered = False
+    covered = True
     for _ in range(3):
       booking_successful = book_court(driver, covered)
       if covered and not booking_successful:
