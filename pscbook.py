@@ -35,6 +35,7 @@ BOOK_BUTTON_XPATH = '//button[text()="Book"]'
 NEXT_BUTTON_XPATH = '//div[@class="content active"]//button[span[text()=" Next "]]'
 SECTIONS_XPATH = '//div[@class="StepperItem StepperItemFluid "]'
 CONTENT_ACTIVE_XPATH = '//div[@class="content active"]'
+INNER_HTML_ATTRIBUTE = 'innerHTML'
 
 
 logger = logging.getLogger(__name__)
@@ -86,11 +87,12 @@ def click_button_by_xpath(driver, button_xpath):
       element = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, button_xpath))
       )
+      logger.info(f'Clicking button: {element.get_attribute(INNER_HTML_ATTRIBUTE)}')
       element.click()
       time.sleep(5)
       break
     except (StaleElementReferenceException, ElementClickInterceptedException):
-      logging.exception('Stale when trying to click button.')
+      logger.exception(f'Stale when trying to click button.')
 
 
 def click_time_selection(driver, time_selection_xpath):
@@ -100,10 +102,11 @@ def click_time_selection(driver, time_selection_xpath):
         EC.presence_of_element_located((By.XPATH, time_selection_xpath))
       )
       if 'red' in time_selection_element.get_attribute('class').split(' '):
-        logging.error(f'Time selection not available: {time_selection_xpath}')
+        logger.error(f'Time selection not available: {time_selection_xpath}')
         return False
       if 'primary' in time_selection_element.get_attribute('class').split(' '):
         return True
+      logger.info(f'time selection {time_selection_element.get_attribute(INNER_HTML_ATTRIBUTE)}')
       time_selection_element.click()
       time.sleep(5)
       # Verify time selected.
@@ -111,11 +114,11 @@ def click_time_selection(driver, time_selection_xpath):
         EC.presence_of_element_located((By.XPATH, time_selection_xpath))
       )
       if 'primary' not in time_selection_element.get_attribute('class'):
-        logging.error('Time available but did not click.')
+        logger.error('Time available but did not click.')
         return False
       return True
     except StaleElementReferenceException as e:
-      logging.exception('Stale reference exception.')
+      logger.exception('Stale reference exception.')
   return False
 
 
@@ -149,7 +152,7 @@ def book_court(driver, covered):
     time_selection_1_result = click_time_selection(driver, TIME_SELECTION_1_XPATH)
     time_selection_2_result = click_time_selection(driver, TIME_SELECTION_2_XPATH)
     if not (time_selection_1_result or time_selection_2_result):
-      logging.error(f'Both time selections not available.')
+      logger.error(f'Both time selections not available.')
       return False
   except (TimeoutException, ElementNotInteractableException) as e:
     logger.exception(f'Failed to select time. Court may be unavailable.')
@@ -158,16 +161,16 @@ def book_court(driver, covered):
   try:
     sections = driver.find_elements(By.XPATH, SECTIONS_XPATH)
     if not contains_element(sections[0], CONTENT_ACTIVE_XPATH):
-      logging.error('Wrong div active.')
+      logger.error('Wrong div active.')
     click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
     # Verify next section active.
     if not contains_element(sections[1], CONTENT_ACTIVE_XPATH):
-      logging.error('Wrong div active1.')
+      logger.error('Wrong div active1.')
     time.sleep(3)
     click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
     # Verify next section active.
     if not contains_element(sections[2], CONTENT_ACTIVE_XPATH):
-      logging.error('Wrong div active2.')
+      logger.error('Wrong div active2.')
     click_button_by_xpath(driver, CLUB_CREDITS_SELECTION_XPATH)
     # Wait for club credits to be selected.
     WebDriverWait(driver, 10).until(
@@ -176,7 +179,7 @@ def book_court(driver, covered):
     click_button_by_xpath(driver, BOOK_BUTTON_XPATH)
     time.sleep(10)
   except (TimeoutException, ElementNotInteractableException) as e:
-    logger.exception(f'Failed to complete booking. html: {driver.page_source}')
+    logger.exception(f'Failed to complete booking.')
     return False
   logger.info('Booked court.')
   return True
