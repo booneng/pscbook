@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import time
+import pprint
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -96,10 +97,11 @@ def click_button_by_xpath(driver, button_xpath):
       logger.info(f'Clicking button: {element.get_attribute(INNER_HTML_ATTRIBUTE)}')
       element.click()
       time.sleep(5)
-      break
+      return True
     except (StaleElementReferenceException, ElementClickInterceptedException):
       logger.exception(f'Stale when trying to click button.')
-
+      pprint.pprint(driver.page_source)
+  return False
 
 def click_time_selection(driver, time_selection_xpath):
   for _ in range(2):
