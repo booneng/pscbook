@@ -89,7 +89,7 @@ def click_button_by_xpath(driver, button_xpath):
   Raises:
     TimeoutException: When element cannot be found or clicked.
   """
-  for _ in range(3):
+  for _ in range(5):
     try:
       element = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, button_xpath))
@@ -181,19 +181,15 @@ def book_court(driver, covered):
     return False
 
   try:
-    sections = driver.find_elements(By.XPATH, SECTIONS_XPATH)
-    if not contains_element(sections[0], CONTENT_ACTIVE_XPATH):
-      logger.error('Wrong div active.')
-    click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
-    # Verify next section active.
-    if not contains_element(sections[1], CONTENT_ACTIVE_XPATH):
-      logger.error('Wrong div active1.')
-    time.sleep(3)
-    click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
-    # Verify next section active.
-    if not contains_element(sections[2], CONTENT_ACTIVE_XPATH):
-      logger.error('Wrong div active2.')
-    click_button_by_xpath(driver, CLUB_CREDITS_SELECTION_XPATH)
+    click_result = click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
+    if not click_result:
+      logger.error('Failed to click first next button.')
+    click_result = click_button_by_xpath(driver, NEXT_BUTTON_XPATH)
+    if not click_result:
+      logger.error('Failed to click second next button.')
+    click_result = click_button_by_xpath(driver, CLUB_CREDITS_SELECTION_XPATH)
+    if not click_result:
+      logger.error('Failed to click club credits button.')
     # Wait for club credits to be selected.
     WebDriverWait(driver, 10).until(
       EC.presence_of_element_located((By.XPATH, CLUB_CREDITS_ACTIVE_XPATH))
