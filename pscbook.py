@@ -1,3 +1,4 @@
+from absl import app, flags
 import datetime
 import logging
 import os
@@ -28,10 +29,7 @@ BOOKING_SITE = "https://picklesocialclub.playbypoint.com/book/picklesocialclub"
 DAY_SELECTION_XPATH = '//button[div[@class="day_number" and text()="{}"]]'
 COVERED_TYPE_SELECTION_XPATH = '//button[text()="Covered Pickleball"]'
 OUTDOOR_TYPE_SELECTION_XPATH = '//button[text()="Outdoor Pickleball"]'
-TIME_SELECTION_1_XPATH = '//button[text()="8-9am"]'
-TIME_SELECTION_2_XPATH = '//button[text()="9-10am"]'
-# TIME_SELECTION_1_XPATH = '//button[text()="12-1pm"]'
-# TIME_SELECTION_2_XPATH = '//button[text()="1-2pm"]'
+TIME_SELECTION_XPATH = '//button[text()="{}"]'
 CLUB_CREDITS_SELECTION_XPATH = '//a[text()="Club credits"]'
 CLUB_CREDITS_ACTIVE_XPATH = '//a[@class="item active" and text()="Club credits"]'
 BOOK_BUTTON_XPATH = '//button[text()="Book"]'
@@ -43,6 +41,14 @@ INNER_HTML_ATTRIBUTE = 'innerHTML'
 
 OUTDOOR_COURT_PRIORITY = [2, 4, 1, 3]
 COVERED_COURT_PRIORITY = [5, 7, 6, 8]
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_list(
+    'times',  # flag name
+    ['8-9am', '9-10am'],  # default value
+    'A list of names'  # help text
+)
 
 
 logger = logging.getLogger(__name__)
@@ -138,12 +144,13 @@ def contains_element(element, child_xpath):
     return False
 
 
-def book_court(driver, covered):
+def book_court(driver, covered, times):
   """Books a court 7 days later.
   
   Args:
     driver: Selenium webdriver used for interacting with the websites.
     covered: Whether to book covered or outdoor court.
+    times: List of strings for booking times.
 
   Returns:
     Boolean for whether the booking was successful.
@@ -157,10 +164,11 @@ def book_court(driver, covered):
   try:
     click_button_by_xpath(driver, DAY_SELECTION_XPATH.format(day_number))
     click_button_by_xpath(driver, court_type_xpath)
-    time_selection_1_result = click_time_selection(driver, TIME_SELECTION_1_XPATH)
-    time_selection_2_result = click_time_selection(driver, TIME_SELECTION_2_XPATH)
-    if not (time_selection_1_result or time_selection_2_result):
-      logger.error(f'Both time selections not available.')
+    time_selection_results = []
+    for time in times:
+      time_selection_results.append(click_time_selection(driver, TIME_SELECTION_XPATH.format(time)))
+    if all(result is False for result in time_selection_results):
+      logger.error(f'All time selections not available.')
       return False
     court_priority = COVERED_COURT_PRIORITY if covered else OUTDOOR_COURT_PRIORITY
     court_clicked = False
@@ -203,7 +211,8 @@ def book_court(driver, covered):
   return True
 
 
-def main():
+def main(argv):
+  del argv
   logging.basicConfig(
     # stream=sys.stdout,
     filename='pscbook.log',
@@ -233,14 +242,14 @@ def main():
     logger.info('Logged in.')
     covered = True
     for _ in range(3):
-      booking_successful = book_court(driver, covered)
+      booking_successful = book_court(driver, covered, FLAGS.times)
       if covered and not booking_successful:
         covered = False
-        booking_successful = book_court(driver, covered)
+        booking_successful = book_court(driver, covered, FLAGS.times)
       logger.info(f'Booking result: {booking_successful}')
   finally:
     logger.info('Completed bookings.')
     driver.quit()
 
 if __name__ == '__main__':
-  main()
+  app.run(main)
