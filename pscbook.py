@@ -144,13 +144,13 @@ def contains_element(element, child_xpath):
     return False
 
 
-def book_court(driver, covered, times):
+def book_court(driver, covered, time_selections):
   """Books a court 7 days later.
   
   Args:
     driver: Selenium webdriver used for interacting with the websites.
     covered: Whether to book covered or outdoor court.
-    times: List of strings for booking times.
+    time_selections: List of strings for booking time_selections.
 
   Returns:
     Boolean for whether the booking was successful.
@@ -165,8 +165,8 @@ def book_court(driver, covered, times):
     click_button_by_xpath(driver, DAY_SELECTION_XPATH.format(day_number))
     click_button_by_xpath(driver, court_type_xpath)
     time_selection_results = []
-    for time in times:
-      time_selection_results.append(click_time_selection(driver, TIME_SELECTION_XPATH.format(time)))
+    for time_selection in time_selections:
+      time_selection_results.append(click_time_selection(driver, TIME_SELECTION_XPATH.format(time_selection)))
     if all(result is False for result in time_selection_results):
       logger.error(f'All time selections not available.')
       return False
